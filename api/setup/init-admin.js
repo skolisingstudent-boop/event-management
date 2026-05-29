@@ -1,9 +1,9 @@
 const bcrypt = require('bcrypt');
 const { query } = require('../lib/db');
+const { handleCors } = require('../lib/cors');
 
 module.exports = async (req, res) => {
-  res.setHeader('Content-Type', 'application/json');
-  res.setHeader('Access-Control-Allow-Origin', '*');
+  if (handleCors(req, res)) return;
 
   if (req.method !== 'GET') {
     return res.status(405).json({ error: 'Method not allowed' });
