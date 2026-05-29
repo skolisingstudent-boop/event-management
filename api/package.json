@@ -1,0 +1,10 @@
+{
+  "name": "event-management-api",
+  "version": "1.0.0",
+  "description": "Event Management API - Vercel Serverless Functions",
+  "main": "api/health.js",
+  "dependencies": {
+    "pg": "^8.10.0",
+    "bcrypt": "^5.1.0"
+  }
+}
