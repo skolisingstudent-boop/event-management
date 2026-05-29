@@ -36,3 +36,5 @@ logs/
 
 # Misc
 .turbo/
+.vercel
+.env*
