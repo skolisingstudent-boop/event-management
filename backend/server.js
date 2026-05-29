@@ -377,9 +377,78 @@ app.post('/api/admin/users/:id/make-admin', (req, res) => {
   });
 });
 
+// Setup: Initialize admin user
+app.post('/api/setup/init-admin', async (req, res) => {
+  try {
+    // Check if admin user already exists
+    db.get('SELECT id FROM users WHERE username = ?', ['admin'], async (err, user) => {
+      if (err) {
+        console.error(err);
+        return res.status(500).json({ error: 'Database error' });
+      }
+
+      // If admin already exists, return success
+      if (user) {
+        return res.json({ message: 'Admin user already exists', success: true });
+      }
+
+      // Create admin user
+      try {
+        const hashedPassword = await bcrypt.hash('12345678', 10);
+        const stmt = db.prepare(
+          'INSERT INTO users (username, email, password, is_admin) VALUES (?, ?, ?, ?)'
+        );
+        
+        stmt.run(['admin', 'admin@event-management.com', hashedPassword, 1], function(err) {
+          if (err) {
+            console.error('Error creating admin user:', err);
+            return res.status(500).json({ error: 'Failed to create admin user' });
+          }
+          
+          res.json({ 
+            message: 'Admin user created successfully',
+            username: 'admin',
+            password: '12345678',
+            success: true
+          });
+        });
+        stmt.finalize();
+      } catch (error) {
+        console.error(error);
+        res.status(500).json({ error: 'Failed to create admin user' });
+      }
+    });
+  } catch (error) {
+    console.error(error);
+    res.status(500).json({ error: 'Setup failed' });
+  }
+});
+
 // Start server
 const server = app.listen(PORT, () => {
   console.log(`Server running on http://localhost:${PORT}`);
+  
+  // Initialize admin user on startup
+  setTimeout(() => {
+    const http = require('http');
+    const initReq = http.request({
+      hostname: 'localhost',
+      port: PORT,
+      path: '/api/setup/init-admin',
+      method: 'POST',
+      headers: { 'Content-Length': 0 }
+    }, (res) => {
+      res.on('data', () => {});
+      res.on('end', () => {
+        console.log('Admin user initialization attempted');
+      });
+    });
+    
+    initReq.on('error', (e) => {
+      console.log('Could not initialize admin user:', e.message);
+    });
+    initReq.end();
+  }, 100);
 });
 
 // Graceful shutdown

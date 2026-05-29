@@ -80,8 +80,7 @@ function App() {
       const response = await axios.get('/api/admin/users?adminKey=admin123')
       setUsers(response.data)
     } catch (err) {
-      setError('Failed to fetch users')
-      console.error(err)
+      console.error('Failed to fetch users:', err)
     }
   }
 
@@ -90,15 +89,28 @@ function App() {
     e.preventDefault()
     try {
       setLoading(true)
-      const response = await axios.post('/api/auth/login', loginData)
+      setError('')
+      
+      // Call backend login endpoint
+      const response = await axios.post('/api/auth/login', {
+        username: loginData.username,
+        password: loginData.password
+      })
+      
       const user = response.data
       setCurrentUser(user)
       localStorage.setItem('currentUser', JSON.stringify(user))
       setLoginData({ username: '', password: '' })
+      
+      // Fetch users and events after login
+      await fetchUsers()
+      await fetchEvents()
+      await fetchUpcomingEvents()
+      
       setCurrentPage('events')
-      setError('')
     } catch (err) {
-      setError(err.response?.data?.error || 'Login failed')
+      setError(err.response?.data?.error || 'Login failed. Please check your credentials.')
+      console.error('Login error:', err)
     } finally {
       setLoading(false)
     }
@@ -220,95 +232,82 @@ function App() {
     setValidationErrors([])
   }
 
-  const goToAdminPanel = async () => {
-    await fetchUsers()
-    setCurrentPage('admin')
-  }
-
   // Render functions
-  const renderLoginPage = () => (
-    <div className="auth-container">
-      <div className="auth-form">
-        <h2>Login</h2>
-        {error && <div className="error-message">{error}</div>}
-        <form onSubmit={handleLogin}>
-          <input
-            type="text"
-            name="username"
-            placeholder="Username"
-            value={loginData.username}
-            onChange={(e) => handleAuthInputChange(e, false)}
-            required
-          />
-          <input
-            type="password"
-            name="password"
-            placeholder="Password"
-            value={loginData.password}
-            onChange={(e) => handleAuthInputChange(e, false)}
-            required
-          />
-          <button type="submit" disabled={loading}>
-            {loading ? 'Logging in...' : 'Login'}
-          </button>
-        </form>
-        <p>Don't have an account? <button className="link-btn" onClick={() => setCurrentPage('register')}>Register</button></p>
-      </div>
-    </div>
-  )
-
-  const renderRegisterPage = () => (
-    <div className="auth-container">
-      <div className="auth-form">
-        <h2>Register</h2>
-        {error && <div className="error-message">{error}</div>}
-        <form onSubmit={handleRegister}>
-          <input
-            type="text"
-            name="username"
-            placeholder="Username (min 3 chars)"
-            value={registerData.username}
-            onChange={(e) => handleAuthInputChange(e, true)}
-            required
-          />
-          <input
-            type="email"
-            name="email"
-            placeholder="Email"
-            value={registerData.email}
-            onChange={(e) => handleAuthInputChange(e, true)}
-            required
-          />
-          <input
-            type="password"
-            name="password"
-            placeholder="Password (min 6 chars)"
-            value={registerData.password}
-            onChange={(e) => handleAuthInputChange(e, true)}
-            required
-          />
-          <input
-            type="password"
-            name="confirmPassword"
-            placeholder="Confirm Password"
-            value={registerData.confirmPassword}
-            onChange={(e) => handleAuthInputChange(e, true)}
-            required
-          />
-          <button type="submit" disabled={loading}>
-            {loading ? 'Registering...' : 'Register'}
-          </button>
-        </form>
-        <p>Already have an account? <button className="link-btn" onClick={() => setCurrentPage('login')}>Login</button></p>
-      </div>
-    </div>
-  )
-
   const renderAdminPanel = () => (
     <div className="admin-container">
-      <h2>Admin Panel</h2>
-      <button className="btn-secondary" onClick={() => setCurrentPage('events')}>Back to Events</button>
+      <header>
+        <h1>Admin Panel - Event Management</h1>
+      </header>
       
+      {error && <div className="error-message">{error}</div>}
+      {validationErrors.length > 0 && (
+        <div className="validation-errors">
+          <strong>Please fix the following errors:</strong>
+          <ul>
+            {validationErrors.map((err, idx) => (
+              <li key={idx}>{err}</li>
+            ))}
+          </ul>
+        </div>
+      )}
+
+      <section className="admin-section">
+        <h2>Create/Edit Event</h2>
+        <form onSubmit={handleSubmitEvent}>
+          <input
+            type="text"
+            name="title"
+            placeholder="Event Title *"
+            value={formData.title}
+            onChange={handleInputChange}
+            required
+          />
+          <textarea
+            name="description"
+            placeholder="Event Description (max 1000 chars)"
+            value={formData.description}
+            onChange={handleInputChange}
+            maxLength={1000}
+          />
+          <input
+            type="datetime-local"
+            name="event_date"
+            value={formData.event_date}
+            onChange={handleInputChange}
+            required
+          />
+          <input
+            type="text"
+            name="location"
+            placeholder="Location (max 255 chars)"
+            value={formData.location}
+            onChange={handleInputChange}
+            maxLength={255}
+          />
+          <div className="form-buttons">
+            <button type="submit" disabled={loading}>
+              {loading ? 'Saving...' : editingId ? 'Update Event' : 'Create Event'}
+            </button>
+            {editingId && (
+              <button type="button" className="btn-secondary" onClick={handleCancelEdit}>
+                Cancel
+              </button>
+            )}
+          </div>
+        </form>
+      </section>
+
+      <section className="admin-section">
+        <h2>Search Events</h2>
+        <input
+          type="text"
+          placeholder="Search events by title, description, or location..."
+          value={searchTerm}
+          onChange={(e) => setSearchTerm(e.target.value)}
+          className="search-input"
+        />
+      </section>
+
       <section className="admin-section">
         <h3>Users Management ({users.length})</h3>
         {users.length > 0 ? (
@@ -338,7 +337,7 @@ function App() {
       </section>
 
       <section className="admin-section">
-        <h3>All Events ({events.length})</h3>
+        <h3>All Events {searchTerm && `(Search: "${searchTerm}")`} ({events.length})</h3>
         {events.length > 0 ? (
           <table className="admin-table">
             <thead>
@@ -347,6 +346,7 @@ function App() {
                 <th>Date</th>
                 <th>Location</th>
                 <th>Created</th>
+                <th>Actions</th>
               </tr>
             </thead>
             <tbody>
@@ -356,6 +356,14 @@ function App() {
                   <td>{new Date(event.event_date).toLocaleString()}</td>
                   <td>{event.location || '-'}</td>
                   <td>{new Date(event.created_at).toLocaleDateString()}</td>
+                  <td>
+                    <button className="btn-edit" onClick={() => handleEditEvent(event)} title="Edit event">
+                      ✎ Edit
+                    </button>
+                    <button className="btn-delete" onClick={() => handleDeleteEvent(event.id)} title="Delete event">
+                      ✕ Delete
+                    </button>
+                  </td>
                 </tr>
               ))}
             </tbody>
@@ -365,178 +373,41 @@ function App() {
     </div>
   )
 
-  const renderEventsPage = () => (
-    <div className="app">
-      <header>
-        <h1>Event Management</h1>
-        <div className="header-right">
-          <span>Welcome, {currentUser.username}!</span>
-          {currentUser.isAdmin && (
-            <button className="btn-admin" onClick={goToAdminPanel}>Admin Panel</button>
-          )}
-          <button className="btn-logout" onClick={handleLogout}>Logout</button>
-        </div>
-      </header>
-
-      <main>
+  const renderLoginPage = () => (
+    <div className="auth-container">
+      <div className="auth-form">
+        <h2>Admin Login</h2>
         {error && <div className="error-message">{error}</div>}
-        {validationErrors.length > 0 && (
-          <div className="validation-errors">
-            <strong>Please fix the following errors:</strong>
-            <ul>
-              {validationErrors.map((err, idx) => (
-                <li key={idx}>{err}</li>
-              ))}
-            </ul>
-          </div>
-        )}
-
-        {/* Search Bar */}
-        <section className="search-section">
+        <form onSubmit={handleLogin}>
           <input
             type="text"
-            placeholder="Search events by title, description, or location..."
-            value={searchTerm}
-            onChange={(e) => setSearchTerm(e.target.value)}
-            className="search-input"
+            name="username"
+            placeholder="Username"
+            value={loginData.username}
+            onChange={(e) => handleAuthInputChange(e, false)}
+            required
           />
-        </section>
-
-        {/* Create/Edit Event Form */}
-        <section className="create-event">
-          <h2>{editingId ? 'Edit Event' : 'Create New Event'}</h2>
-          <form onSubmit={handleSubmitEvent}>
-            <input
-              type="text"
-              name="title"
-              placeholder="Event Title *"
-              value={formData.title}
-              onChange={handleInputChange}
-              required
-            />
-            <textarea
-              name="description"
-              placeholder="Event Description (max 1000 chars)"
-              value={formData.description}
-              onChange={handleInputChange}
-              maxLength={1000}
-            />
-            <input
-              type="datetime-local"
-              name="event_date"
-              value={formData.event_date}
-              onChange={handleInputChange}
-              required
-            />
-            <input
-              type="text"
-              name="location"
-              placeholder="Location (max 255 chars)"
-              value={formData.location}
-              onChange={handleInputChange}
-              maxLength={255}
-            />
-            <div className="form-buttons">
-              <button type="submit" disabled={loading}>
-                {loading ? 'Saving...' : editingId ? 'Update Event' : 'Create Event'}
-              </button>
-              {editingId && (
-                <button type="button" className="btn-secondary" onClick={handleCancelEdit}>
-                  Cancel
-                </button>
-              )}
-            </div>
-          </form>
-        </section>
-
-        {/* Upcoming Events */}
-        <section className="events-section">
-          <h2>Upcoming Events ({upcomingEvents.length})</h2>
-          {upcomingEvents.length === 0 ? (
-            <p>No upcoming events</p>
-          ) : (
-            <div className="events-list">
-              {upcomingEvents.map(event => (
-                <div key={event.id} className="event-card">
-                  <div className="event-card-header">
-                    <h3>{event.title}</h3>
-                    <div className="event-actions">
-                      <button 
-                        className="btn-edit"
-                        onClick={() => handleEditEvent(event)}
-                        title="Edit event"
-                      >
-                        ✎
-                      </button>
-                      <button 
-                        className="btn-delete"
-                        onClick={() => handleDeleteEvent(event.id)}
-                        title="Delete event"
-                      >
-                        ✕
-                      </button>
-                    </div>
-                  </div>
-                  {event.description && <p className="event-description">{event.description}</p>}
-                  <p className="event-date">
-                    📅 {new Date(event.event_date).toLocaleString()}
-                  </p>
-                  {event.location && <p className="event-location">📍 {event.location}</p>}
-                </div>
-              ))}
-            </div>
-          )}
-        </section>
-
-        {/* All Events */}
-        <section className="events-section">
-          <h2>All Events {searchTerm && `(Search: "${searchTerm}")`} ({events.length})</h2>
-          {loading ? (
-            <p>Loading...</p>
-          ) : events.length === 0 ? (
-            <p>No events yet</p>
-          ) : (
-            <div className="events-list">
-              {events.map(event => (
-                <div key={event.id} className="event-card">
-                  <div className="event-card-header">
-                    <h3>{event.title}</h3>
-                    <div className="event-actions">
-                      <button 
-                        className="btn-edit"
-                        onClick={() => handleEditEvent(event)}
-                        title="Edit event"
-                      >
-                        ✎
-                      </button>
-                      <button 
-                        className="btn-delete"
-                        onClick={() => handleDeleteEvent(event.id)}
-                        title="Delete event"
-                      >
-                        ✕
-                      </button>
-                    </div>
-                  </div>
-                  {event.description && <p className="event-description">{event.description}</p>}
-                  <p className="event-date">
-                    📅 {new Date(event.event_date).toLocaleString()}
-                  </p>
-                  {event.location && <p className="event-location">📍 {event.location}</p>}
-                </div>
-              ))}
-            </div>
-          )}
-        </section>
-      </main>
+          <input
+            type="password"
+            name="password"
+            placeholder="Password"
+            value={loginData.password}
+            onChange={(e) => handleAuthInputChange(e, false)}
+            required
+          />
+          <button type="submit" disabled={loading}>
+            {loading ? 'Logging in...' : 'Login'}
+          </button>
+        </form>
+        <p style={{ marginTop: '10px', fontSize: '12px', color: '#666' }}>
+          Demo credentials: admin / 12345678
+        </p>
+      </div>
     </div>
   )
 
   // Main render
   if (!currentUser) {
-    if (currentPage === 'register') {
-      return renderRegisterPage()
-    }
     return renderLoginPage()
   }
 
@@ -544,7 +415,7 @@ function App() {
     return renderAdminPanel()
   }
 
-  return renderEventsPage()
+  return renderAdminPanel()
 }
 
 export default App
