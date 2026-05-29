@@ -53,7 +53,7 @@ function App() {
   const fetchEvents = async () => {
     try {
       setLoading(true)
-      const url = searchTerm 
+      const url = searchTerm
         ? `/api/events?search=${encodeURIComponent(searchTerm)}`
         : '/api/events'
       const response = await axios.get(url)
