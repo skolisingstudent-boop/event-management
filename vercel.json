@@ -10,8 +10,5 @@
       "source": "/:path*",
       "destination": "/index.html"
     }
-  ],
-  "env": [
-    "DATABASE_URL"
   ]
 }
