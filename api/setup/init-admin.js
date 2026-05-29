@@ -1,9 +1,12 @@
-import { query } from '../lib/db.js'
-import bcrypt from 'bcrypt'
+const bcrypt = require('bcrypt');
+const { query } = require('../../lib/db');
 
-export default async function handler(req, res) {
+module.exports = async (req, res) => {
+  res.setHeader('Content-Type', 'application/json');
+  res.setHeader('Access-Control-Allow-Origin', '*');
+
   if (req.method !== 'GET') {
-    return res.status(405).json({ error: 'Method not allowed' })
+    return res.status(405).json({ error: 'Method not allowed' });
   }
 
   try {
@@ -11,18 +14,18 @@ export default async function handler(req, res) {
     const checkAdmin = await query(
       'SELECT id FROM users WHERE username = $1',
       ['admin']
-    )
+    );
 
     if (checkAdmin.rows.length > 0) {
       return res.status(200).json({
         status: 'SUCCESS',
         message: 'Admin user already exists',
         user: { username: 'admin' }
-      })
+      });
     }
 
     // Hash the password
-    const hashedPassword = await bcrypt.hash('12345678', 10)
+    const hashedPassword = await bcrypt.hash('12345678', 10);
 
     // Create admin user
     const result = await query(
@@ -30,7 +33,7 @@ export default async function handler(req, res) {
        VALUES ($1, $2, $3, $4, NOW()) 
        RETURNING id, username, email, is_admin`,
       ['admin', 'admin@eventmanagement.local', hashedPassword, true]
-    )
+    );
 
     res.status(201).json({
       status: 'SUCCESS',
@@ -41,12 +44,12 @@ export default async function handler(req, res) {
         email: result.rows[0].email,
         isAdmin: result.rows[0].is_admin
       }
-    })
+    });
   } catch (err) {
-    console.error('Setup error:', err)
+    console.error('Setup error:', err);
     res.status(500).json({
       status: 'ERROR',
       error: err.message
-    })
+    });
   }
-}
+};
