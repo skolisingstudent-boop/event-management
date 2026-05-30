@@ -23,6 +23,12 @@
   - [ ] Output Directory: `frontend/dist`
 - [ ] Add Environment Variables:
   - [ ] `DATABASE_URL` = (your Supabase connection string)
+  - [ ] Optional fallback if DNS fails:
+    - `DB_HOST_IP` = (Supabase IP)
+    - `DB_PORT` = `6543`
+    - `DB_PASSWORD` = (your database password)
+    - `DB_NAME` = `postgres`
+    - `DB_SSL_MODE` = `disable`
 
 ### 4. After Deployment
 - [ ] Test health endpoint: `/api/health`

@@ -143,6 +143,17 @@ Example:
 postgresql://postgres:YOUR_PASSWORD@db.xxx.supabase.co:6543/postgres?sslmode=require
 ```
 
+If Vercel cannot resolve the Supabase hostname, use these optional values instead of `DATABASE_URL`:
+```
+DB_HOST_IP=123.45.67.89
+DB_PORT=6543
+DB_USER=postgres
+DB_PASSWORD=YOUR_PASSWORD
+DB_NAME=postgres
+DB_SSL_MODE=disable
+```
+
+
 ⚠️ Make sure:
 - It starts with `postgresql://`
 - It ends with `?sslmode=require`

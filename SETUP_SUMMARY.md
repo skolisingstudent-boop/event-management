@@ -112,13 +112,24 @@ event-management/
 
 ## Environment Variables Needed
 
-For Vercel deployment, you need 1 variable:
+For Vercel deployment, you need 1 primary variable:
 
 ```
 DATABASE_URL = postgresql://[user]:[password]@[host]:[port]/[database]?sslmode=require
 ```
 
 (Get from Supabase Settings → Database → Connection String)
+
+If Vercel cannot resolve the Supabase hostname from the serverless runtime, add these optional fallback variables instead:
+
+```
+DB_HOST_IP = 123.45.67.89
+DB_PORT = 6543
+DB_USER = postgres
+DB_PASSWORD = [password]
+DB_NAME = postgres
+DB_SSL_MODE = disable
+```
 
 ---
 
