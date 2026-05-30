@@ -8,14 +8,14 @@ function getConnectionString() {
     return process.env.DATABASE_URL;
   }
 
-  const host = process.env.DB_HOST;
+  const host = process.env.DB_HOST || process.env.DB_HOST_IP;
   const port = process.env.DB_PORT || '6543';
   const user = process.env.DB_USER || 'postgres';
   const password = process.env.DB_PASSWORD;
   const database = process.env.DB_NAME || 'postgres';
 
   if (!host) {
-    throw new Error('Missing DATABASE_URL and DB_HOST environment variables');
+    throw new Error('Missing DATABASE_URL and DB_HOST/DB_HOST_IP environment variables');
   }
 
   if (!password) {
@@ -37,6 +37,7 @@ function getPool() {
         port: parsed.port,
         database: parsed.pathname.replace(/\//g, ''),
         user: parsed.username,
+        sslMode: process.env.DB_SSL_MODE || 'default',
       };
     } catch (err) {
       connectionInfo.error = err.message;
@@ -46,7 +47,7 @@ function getPool() {
 
     pool = new Pool({
       connectionString,
-      ssl: process.env.NODE_ENV === 'production' ? { rejectUnauthorized: false } : false,
+      ssl: process.env.DB_SSL_MODE === 'disable' ? false : process.env.NODE_ENV === 'production' ? { rejectUnauthorized: false } : false,
     });
   }
   return pool;
