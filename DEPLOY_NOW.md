@@ -54,7 +54,7 @@ After clicking Import, you'll see "Configure Project" page. Fill in:
 
 Example of what it should look like:
 ```
-postgresql://postgres.abcdefghij:your_password@db.supabaseproject.supabase.co:5432/postgres?sslmode=require
+postgresql://postgres.abcdefghij:your_password@db.supabaseproject.supabase.co:6543/postgres?sslmode=require
 ```
 
 ---

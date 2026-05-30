@@ -140,7 +140,7 @@ Click "Add Environment Variable" and add:
 
 Example:
 ```
-postgresql://postgres:YOUR_PASSWORD@db.xxx.supabase.co:5432/postgres?sslmode=require
+postgresql://postgres:YOUR_PASSWORD@db.xxx.supabase.co:6543/postgres?sslmode=require
 ```
 
 ⚠️ Make sure:
