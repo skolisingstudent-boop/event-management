@@ -1,18 +1,75 @@
+const dns = require('dns').promises;
+const net = require('net');
 const { Pool } = require('pg');
 const { URL } = require('url');
 
 let pool = null;
 
-function getConnectionString() {
-  if (process.env.DATABASE_URL) {
-    return process.env.DATABASE_URL;
+function isIpLiteral(host) {
+  return net.isIP(host) !== 0;
+}
+
+async function resolveFallbackHost(host) {
+  if (isIpLiteral(host)) {
+    return host;
   }
 
-  const host = process.env.DB_HOST || process.env.DB_HOST_IP;
-  const port = process.env.DB_PORT || '6543';
+  try {
+    const addresses = await dns.resolve6(host);
+    if (addresses && addresses.length > 0) {
+      return addresses[0];
+    }
+  } catch (error) {
+    // Ignore; IPv6 may not exist or be unavailable.
+  }
+
+  try {
+    const addresses = await dns.resolve4(host);
+    if (addresses && addresses.length > 0) {
+      return addresses[0];
+    }
+  } catch (error) {
+    // Ignore; IPv4 may not exist or be unavailable.
+  }
+
+  return null;
+}
+
+async function getConnectionString() {
+  const hostIp = process.env.DB_HOST_IP;
+  const hostName = process.env.DB_HOST;
   const user = process.env.DB_USER || 'postgres';
   const password = process.env.DB_PASSWORD;
+  const port = process.env.DB_PORT || '6543';
   const database = process.env.DB_NAME || 'postgres';
+
+  if (hostIp) {
+    if (!password) {
+      throw new Error('Missing DB_PASSWORD environment variable');
+    }
+
+    let host = hostIp;
+    if (host.includes(':') && !host.startsWith('[') && !host.endsWith(']')) {
+      host = `[${host}]`;
+    }
+
+    return `postgresql://${encodeURIComponent(user)}:${encodeURIComponent(password)}@${host}:${port}/${database}`;
+  }
+
+  if (process.env.DATABASE_URL) {
+    const parsedUrl = new URL(process.env.DATABASE_URL);
+
+    if (!isIpLiteral(parsedUrl.hostname)) {
+      const fallbackHost = await resolveFallbackHost(parsedUrl.hostname);
+      if (fallbackHost) {
+        parsedUrl.hostname = fallbackHost;
+      }
+    }
+
+    return parsedUrl.toString();
+  }
+
+  const host = hostName;
 
   if (!host) {
     throw new Error('Missing DATABASE_URL and DB_HOST/DB_HOST_IP environment variables');
@@ -22,12 +79,17 @@ function getConnectionString() {
     throw new Error('Missing DB_PASSWORD environment variable');
   }
 
-  return `postgresql://${encodeURIComponent(user)}:${encodeURIComponent(password)}@${host}:${port}/${database}`;
+  let effectiveHost = host;
+  if (effectiveHost.includes(':') && !effectiveHost.startsWith('[') && !effectiveHost.endsWith(']')) {
+    effectiveHost = `[${effectiveHost}]`;
+  }
+
+  return `postgresql://${encodeURIComponent(user)}:${encodeURIComponent(password)}@${effectiveHost}:${port}/${database}`;
 }
 
-function getPool() {
+async function getPool() {
   if (!pool) {
-    const connectionString = getConnectionString();
+    const connectionString = await getConnectionString();
     let connectionInfo = {};
 
     try {
@@ -54,7 +116,7 @@ function getPool() {
 }
 
 async function query(text, params) {
-  const client = await getPool().connect();
+  const client = await (await getPool()).connect();
   try {
     const result = await client.query(text, params);
     return result;

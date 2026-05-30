@@ -1,4 +1,5 @@
 const { handleCors } = require('./lib/cors');
+const db = require('./lib/db');
 const dns = require('dns').promises;
 const { Pool } = require('pg');
 const net = require('net');
@@ -48,13 +49,14 @@ module.exports = async (req, res) => {
     result.environment.DATABASE_URL_LENGTH = process.env.DATABASE_URL?.length || 0;
     result.environment.DB_HOST = process.env.DB_HOST || null;
     result.environment.DB_HOST_IP = process.env.DB_HOST_IP || null;
+    result.environment.DB_HOST_IP_CONFIGURED = !!process.env.DB_HOST_IP;
     result.environment.DB_PORT = process.env.DB_PORT || '6543';
     result.environment.DB_SSL_MODE = process.env.DB_SSL_MODE || 'default';
 
     if (process.env.DATABASE_URL) {
       result.environment.DATABASE_URL_PREVIEW = process.env.DATABASE_URL.substring(0, 100) + '...';
       
-      // Parse the connection string
+      // Parse the original connection string
       try {
         const parsed = url.parse(process.env.DATABASE_URL, true);
         result.connectionParsing = {
@@ -68,6 +70,18 @@ module.exports = async (req, res) => {
       } catch (e) {
         result.connectionParsing.error = e.message;
       }
+    }
+
+    try {
+      const activeConnection = await db.getConnectionString();
+      const parsedActive = new url.URL(activeConnection);
+      result.environment.ACTIVE_DB_HOST = parsedActive.hostname;
+      result.environment.ACTIVE_DB_PORT = parsedActive.port;
+      result.environment.ACTIVE_DB_NAME = parsedActive.pathname?.replace(/^\//, '') || null;
+      result.environment.ACTIVE_DB_USER = parsedActive.username;
+      result.environment.ACTIVE_DB_URL_PREVIEW = activeConnection.replace(/(postgresql:\/\/[^:]+:)[^@]+(@)/, '$1***$2');
+    } catch (err) {
+      result.environment.ACTIVE_DB_URL_ERROR = err.message;
     }
 
     // DNS checks for the Supabase hostname
